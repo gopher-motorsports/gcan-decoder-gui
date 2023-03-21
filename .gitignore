@@ -1,0 +1,7 @@
+/.vscode
+__pycache__/
+build/
+demo.py
+test.py
+/.build
+
