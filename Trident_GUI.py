@@ -1,3 +1,14 @@
+"""
+TODO:
+go over config file code and add functionality for gophercan
+add new modules fro parameter visualization
+add functionality for gophercan yaml file
+add send parameter functionality
+tweak footer to better represent gophercan
+    Main comm bus: uneeded
+    Device address: uneeded
+Have way to switch to two different pid's? form for Ic and one for EV
+"""
 import dearpygui.dearpygui as dpg
 
 from tabs.USB_Error_Log import USB_Error_Log
