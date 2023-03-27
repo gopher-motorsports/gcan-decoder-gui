@@ -89,90 +89,49 @@ class Decoder_Tab:
 
         self.parameter_table_list.append((paramter_row, parameter_name, parameter_data, parameter_data, time_val))
         
-    def decode_bytes(self, bytes, parameter):
+    def decode_bytes(self, data, parameter):
         #TODO: test code
         # assumes bytes is proerly formatted / length as it is check in the usb driver class / functions
         if parameter["type"] == "UNSIGNED8":
-            return bytes[0]
+            return data[0]
         
         elif parameter["type"] == "SIGNED8":
             # convert unsigend8 to signed8
-            if bytes[0] > 127:
-                return bytes[0] - 128
+            if data[0] > 127:
+                return data[0] - 128
             else:
-                return bytes[0]
+                return data[0]
             
         elif parameter["type"] == "UNSIGNED16":
-            if parameter["encoding"] == "MSB":
-                print(bytes)
-                print(type(bytes))
-                return bytes[1] + (bytes[0] << 8)
-            elif parameter["encoding"] == "LSB":
-                return bytes[0] + (bytes[1] << 8)
-            else:
-                return "error no encoding"
-            
+            return data[0] + (data[1] << 8) 
+        
         elif parameter["type"] == "SIGNED16":
-            if parameter["encoding"] == "MSB":
-                if bytes[1] > 127:
-                    return (bytes[1] - 128) + (bytes[0] << 8) - 32768
-                else:
-                    return bytes[1] + (bytes[0] << 8)
-            elif parameter["encoding"] == "LSB":
-                if bytes[0] > 127:
-                    return (bytes[0] - 128) + (bytes[1] << 8) - 32768
-                else:
-                    return bytes[0] + (bytes[1] << 8)
+            if data[0] > 127:
+                return (data[0] - 128) + (data[1] << 8) - 32768
             else:
-                return "error no encoding"
+                return data[0] + (data[1] << 8)
         
         elif parameter["type"] == "UNSIGNED32":
-            if parameter["encoding"] == "MSB":
-                return bytes[3] + (bytes[2] << 8) + (bytes[1] << 16) + (bytes[0] << 24)
-            elif parameter["encoding"] == "LSB":
-                return bytes[0] + (bytes[1] << 8) + (bytes[2] << 16) + (bytes[3] << 24)
-            else:
-                return "error no encoding"
+            return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24)
         
         elif parameter["type"] == "SIGNED32":
-            if parameter["encoding"] == "MSB":
-                if bytes[3] > 127:
-                    return (bytes[3] - 128) + (bytes[2] << 8) + (bytes[1] << 16) + (bytes[0] << 24) - 2147483648
-                else:
-                    return bytes[3] + (bytes[2] << 8) + (bytes[1] << 16) + (bytes[0] << 24)
-            elif parameter["encoding"] == "LSB":
-                if bytes[0] > 127:
-                    return (bytes[0] - 128) + (bytes[1] << 8) + (bytes[2] << 16) + (bytes[3] << 24) - 2147483648
-                else:
-                    return bytes[0] + (bytes[1] << 8) + (bytes[2] << 16) + (bytes[3] << 24)
+            if data[0] > 127:
+                return (data[0] - 128) + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) - 2147483648
             else:
-                return "error no encoding"
-        
+                return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24)
+
         elif parameter["type"] == "FLOATING":
-            vstr = ''.join([chr(k) for k in bytes]) #chr converts the integer into the corresponding byte
-            return struct.unpack('f', vstr)
+            return round(struct.unpack("f", bytes(data))[0], 2)
         
         elif parameter["type"] == "UNSIGNED64":
-            if parameter["encoding"] == "MSB":
-                return bytes[7] + (bytes[6] << 8) + (bytes[5] << 16) + (bytes[4] << 24) + (bytes[3] << 32) + (bytes[2] << 40) + (bytes[1] << 48) + (bytes[0] << 56)
-            elif parameter["encoding"] == "LSB":
-                return bytes[0] + (bytes[1] << 8) + (bytes[2] << 16) + (bytes[3] << 24) + (bytes[4] << 32) + (bytes[5] << 40) + (bytes[6] << 48) + (bytes[7] << 56)
-            else:
-                return "error no encoding"
+            return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56)
         
         elif parameter["type"] == "SIGNED64":
-            if parameter["encoding"] == "MSB":
-                if bytes[7] > 127:
-                    return (bytes[7] - 128) + (bytes[6] << 8) + (bytes[5] << 16) + (bytes[4] << 24) + (bytes[3] << 32) + (bytes[2] << 40) + (bytes[1] << 48) + (bytes[0] << 56) - 9223372036854775808
-                else:
-                    return bytes[7] + (bytes[6] << 8) + (bytes[5] << 16) + (bytes[4] << 24) + (bytes[3] << 32) + (bytes[2] << 40) + (bytes[1] << 48) + (bytes[0] << 56)
-            elif parameter["encoding"] == "LSB":
-                if bytes[0] > 127:
-                    return (bytes[0] - 128) + (bytes[1] << 8) + (bytes[2] << 16) + (bytes[3] << 24) + (bytes[4] << 32) + (bytes[5] << 40) + (bytes[6] << 48) + (bytes[7] << 56) - 9223372036854775808
-                else:
-                    return bytes[0] + (bytes[1] << 8) + (bytes[2] << 16) + (bytes[3] << 24) + (bytes[4] << 32) + (bytes[5] << 40) + (bytes[6] << 48) + (bytes[7] << 56)
+         
+            if data[0] > 127:
+                return (data[0] - 128) + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56) - 9223372036854775808
             else:
-                return "error no encoding"
+                return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56)
         
         else:
             return "error no type"
