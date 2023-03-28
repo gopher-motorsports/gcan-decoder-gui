@@ -203,7 +203,11 @@ class USB_Interface:
                                 else:
                                     data_output.append(int(data[i]))
                                     i += 1
-                                byte_count += 1   
+                                byte_count += 1
+                        chk = self.ser.read(1) # read checksum 
+                        if chk[0] == 0x7D:
+                            chk = self.ser.read(1)
+                        #TODO: add checksum checking
                         output.append(data_output)
                         if not parameter_flag:
                             self.paramter_list.append(output)

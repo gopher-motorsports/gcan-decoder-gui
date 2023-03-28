@@ -1,15 +1,3 @@
-"""
-TODO:
-go over config file code and add functionality for gophercan
-add new modules fro parameter visualization
-add functionality for gophercan yaml file
-    If no yaml file configured / found, disable connect button
-add send parameter functionality
-tweak footer to better represent gophercan
-    Main comm bus: uneeded
-    Device address: uneeded
-Have way to switch to two different pid's? form for Ic and one for EV
-"""
 import dearpygui.dearpygui as dpg
 
 from tabs.USB_Error_Log import USB_Error_Log
@@ -95,7 +83,7 @@ class Main_GUI:
                 self.parameter_home = Parameter_Home()
                 self.decoder_tab = Decoder_Tab()
                 gui_global.USB_Middleware.usb_error_log_tab = USB_Error_Log()
-                
+
             gui_global.USB_footer = Footer()
 
             # global popup window setup
