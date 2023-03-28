@@ -62,7 +62,9 @@ class Paramter_yaml_status_box():
             
             self.parent = parent
 
-            with dpg.table(header_row=False, policy=dpg.mvTable_SizingFixedFit):  # table prevents child table form stretching past this tables max width
+            with dpg.table(borders_outerH=True, borders_outerV=True, policy=dpg.mvTable_SizingFixedFit, header_row=True, no_host_extendX=True):
+                dpg.add_table_column(init_width_or_weight=410, label="Input")
+
                 dpg.add_table_column(init_width_or_weight=418)  # set max width
                 with dpg.table_row():
                     with dpg.group(horizontal=True):
