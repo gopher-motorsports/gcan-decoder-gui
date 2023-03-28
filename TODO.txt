@@ -1,0 +1,11 @@
+rewrite entire usb comm backend again
+    - still have decoding of messgae in driver, but make it more genaric, have a split between paramter commands 
+      and other commands in middleware
+
+    - make a singletron class for parameters
+
+    - write code to select which yaml to use
+        - start with just going to gophercan folder
+        - look into git libaries and see if we can pull it directly from there
+
+    - add new features

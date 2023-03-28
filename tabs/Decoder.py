@@ -3,7 +3,6 @@ import core_gui.gui_global as gui_global
 import time
 from datetime import datetime
 from core_gui.Shared_modules import Clock, status_box
-import yaml
 import threading
 import struct
 
@@ -12,11 +11,6 @@ class Decoder_Tab:
     clock = Clock()
 
     def __init__(self):
-        
-        # temp code to test functionality should delete and have it be more flexible and be modifiable in the gui
-        with open("go4-23c.yaml", "r") as file:
-            self.gopher_can_config = yaml.safe_load(file)
-            gui_global.USB_Middleware.paramter_data = self.gopher_can_config
 
         self.data_mutex = threading.Lock()
         self.type_dict = { }

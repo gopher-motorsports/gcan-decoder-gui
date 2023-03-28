@@ -116,31 +116,13 @@ class USB_Middleware:
     def send_usb_msg(message_type: str, size_ret_msg: int, expected_msgs_back: int, cmd: str, caller_info=""):
 
         USB_Middleware.usb_lock.acquire()
-        fdcan_msg = False 
 
         if USB_Middleware.USB_connected:
             expected_header_back = None
 
             try:
 
-                if message_type == "FDCAN_RD/WR":
-
-                    # 0x00 is the command code for send fdcan msg
-                    # secondary id is the id of the id of the secondary device we want to talk to (b0, b2, etc)
-                    # 0x80 sets the rd/wr flag for the micro
-                    USB_Middleware.USB_Device_id.send_data(bytearray.fromhex("00" + USB_Middleware.Secondary_id + "80" + "{0:0{1}X}".format(int(len(cmd)/2), 2) + cmd))
-                    expected_header_back = 0x00
-                    fdcan_msg = True
-
-                elif message_type == "FDCAN_WR":
-
-                    # 0x00 is the command code for send fdcan msg
-                    # secondary id is the id of the id of the secondary device we want to talk to (b0, b2, etc)
-                    # 0x00 does not set the rd/wr flag for the micro
-                    USB_Middleware.USB_Device_id.send_data(bytearray.fromhex("00" + USB_Middleware.Secondary_id + "00" + "{0:0{1}X}".format(int(len(cmd)/2), 2) + cmd))
-                    fdcan_msg = True # unnecessary as write messages do not expect a response, still putting it here for consistency
-
-                elif message_type == "I2C_RD/WR":
+                if message_type == "I2C_RD/WR":
 
                     # 0x0A is the command code for RD/WR I2C msg
                     # secondary id is the id of the id of the secondary device we want to talk to (b0, b2, etc)
@@ -169,18 +151,11 @@ class USB_Middleware:
 
             recv_usb_cmds = []
             usb_msgs_received = 0
-            multiple_packets = False
 
             try:
-
                 while usb_msgs_received < expected_msgs_back:
-                    if multiple_packets:
-                        usb_msg = usb_msg[usb_msg[1] + 2:] # cutting off 1st msg
-                        len_msg = len(usb_msg) - 2
-                        multiple_packets = False
-                    else:
-                        usb_msg = USB_Middleware.USB_Device_id.get_data()
-                        len_msg = len(usb_msg) - 2 # remove header bytes
+                    usb_msg = USB_Middleware.USB_Device_id.get_data()
+                    len_msg = len(usb_msg) - 2 # remove header bytes
 
                     if len_msg == -2:  # timeout, just return what was read.
                         USB_Middleware.global_timeout_clock += 1
@@ -191,33 +166,14 @@ class USB_Middleware:
                         multiple_packets = True
 
                     if usb_msg[0] == expected_header_back: 
-                        if fdcan_msg:
-                            if len_msg in fdcan_size_ref and len_msg >= size_ret_msg: # see if length is valid fdcan cmd length / long enough
-                                for _ in range((len_msg - 2) -  size_ret_msg): # loop through excces 9 bytes
-                                    if usb_msg.pop() != 0: # removing excess 0 bytes
-                                        USB_Middleware.usb_lock.release()
-                                        USB_Middleware.USB_Device_id.reset_input_buffer()
-                                        raise Invalid_USB_msg_received
-                                    usb_msg[1] -= 1
+                        # i2c / other msg
+                        if len_msg != size_ret_msg: # invalid length!
+                            USB_Middleware.usb_lock.release()
+                            USB_Middleware.USB_Device_id.reset_input_buffer()
+                            raise Invalid_USB_msg_received
 
-                                usb_msg.pop(2) # removing addr byte so it matches i2c msg exactly
-                                usb_msg[1] -= 1
-                                recv_usb_cmds.append(usb_msg)
-                                usb_msgs_received += 1
-
-                            else: # usb / comm error, invalid fdcan msg length
-                                USB_Middleware.usb_lock.release()
-                                USB_Middleware.USB_Device_id.reset_input_buffer()
-                                raise Invalid_USB_msg_received
-                        
-                        else: # i2c / other msg
-                            if len_msg != size_ret_msg: # invalid length!
-                                USB_Middleware.usb_lock.release()
-                                USB_Middleware.USB_Device_id.reset_input_buffer()
-                                raise Invalid_USB_msg_received
-
-                            recv_usb_cmds.append(usb_msg)
-                            usb_msgs_received += 1
+                        recv_usb_cmds.append(usb_msg)
+                        usb_msgs_received += 1
 
                     elif usb_msg[0] == 0xFF:  # usb error msg
                         USB_Middleware.usb_error_log_tab.add_usb_error(usb_msg, caller_info)
@@ -241,39 +197,17 @@ class USB_Middleware:
         USB_Middleware.usb_lock.release()
         return[]
 
-    # just looks for a non usb error message / parameter message and returns it
-    # handle_usb_error indicates if the method should handle usb error messages like send_usb_msg or just return them
-    # DUE TO THE EXPECTED REPEATED CALLS TO THIS FUNCTION THE GLOBAL USB LOCK IS NOT ACQUIRED IN THIS FUNCTION AND NEEDS TO BE ACQUIRED BY THE CALLER
-    # ccurently this function is not used as send_usb_msg has receive logic built in 
-    @staticmethod
-    def get_usb_msg(handle_usb_error: bool, caller_info = ""):
-
-        while True: # loop till non error message received (if enabled)
-            usb_msg = USB_Middleware.USB_Device_id.get_data()
-            len_msg = len(usb_msg) - 2 # remove header bytes
-
-            if len_msg == -2:  # timeout, just return empty list (does not increment timeout var)
-                return []
-
-            elif usb_msg[0] != 0xff:
-                return usb_msg
-
-            elif handle_usb_error:  # usb error msg
-                USB_Middleware.usb_error_log_tab.add_usb_error(usb_msg, caller_info)
-                # keep going, msg might still be received
-
-            else:  # just return usb error message
-                return usb_msg
-
     # This function gets all parameter messages and returns them in a list
     # due to the nature of the telemetry communication protocol, mutiple messages may be grouped into one list element, as I do not want to put the decoding logic in this class
     @staticmethod
     def get_usb_gophercan_parameter_msg():
+        USB_Middleware.usb_lock.acquire()
         if USB_Middleware.USB_connected:
             usb_msgs = []
             while True: # loop till all parameter messages received 
                 usb_msg = USB_Middleware.USB_Device_id.get_data_paramter()
                 if usb_msg == []:  # timeout, just return empty list (does not increment timeout var)
+                    USB_Middleware.usb_lock.release()
                     return usb_msgs
                 usb_msgs.append(usb_msg) # we know this is a paramter message due to the get_parameter_data function
                     

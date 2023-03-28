@@ -300,4 +300,120 @@ class status_box_bit:
         else:
             self.enabled = True
                     
+# class used to group the id's of the command elements together to allow for easy modification of said elements
+class Command_element():
 
+    def __init__(self, button_label,parent_clock,requires_usb_msg = False, cmd = None, default_format='HEX', enabled=True):
+
+        with dpg.group(horizontal=True) as self.parent:
+
+            self.usb_msg = requires_usb_msg # if this is true data needs to be retrived through usb command vs parameter log
+            self.cmd = cmd                  # cmd to send
+            self.output_value = 0           # stores the raw binary of the status bit, is converted into proper format by self.format_output
+            self.hex_padding = 4            # how long should the hex string be (4 = 2 bytes, 2 = 1 byte, etc)
+            self.clock = parent_clock       # clock object for tab (execute function / lambda every clock cycle)
+
+            self.spacer = dpg.add_spacer(width=-2)
+            self.button = dpg.add_button(label=button_label, width=150, callback=self.send_data)
+            self.output = dpg.add_input_text(readonly=True, width=-100, default_value=0)
+            #TODO: add custom list here for format options
+            self.format = dpg.add_combo(("HEX", "LIN11", "LIN16", "DEC"), width=-30, default_value=default_format, callback=self.format_output)
+            self.enable = dpg.add_checkbox(default_value=enabled, callback=self.change_element_status)
+            
+            if self.usb_msg:
+                self.clock.enable_lst.append(self.enable)
+
+            # while the status is usually updated through the clock you can manually do it though this button as well
+            dpg.set_item_callback(self.button, self.send_data)
+
+            # format output value and display it
+            self.change_element_status()
+
+    # display output  val as hex, lin11, lin16 and dec
+
+    def format_output(self): #TODO: rewrite
+        dpg.set_value(self.output, gui_global.format_data(dpg.get_value(self.format), self.output_value, self.hex_padding))
+
+    # triggered by checkbox / global enable / disable
+    def change_element_status(self):
+
+        self.clock.mutex.acquire()  # have to acquire this as wee will ben adding / removing form the global clock funs dict
+
+        # enable element, enables callbacks and un-applies the disabled theme to the items (defined in Main_GUI.py)
+        if(dpg.get_value(self.enable)):
+            dpg.enable_item(self.button)
+            dpg.enable_item(self.output)
+            dpg.enable_item(self.format)
+            # add to clock dict (lambda fun will be called every clock cycle)
+
+            if self.cmd is not None and self.usb_msg is True:
+                callbk = dpg.get_item_callback(self.button)
+                self.clock.lambda_dict.update({self: (lambda: callbk())})
+
+        # disable element, disables callbacks and applies the disabled theme to the items (defined in Main_GUI.py)
+        else:
+
+            dpg.disable_item(self.button)
+            dpg.disable_item(self.output)
+            dpg.disable_item(self.format)
+
+            if self.cmd is not None and self.usb_msg is True:
+
+                try:
+                    # remove clock from dict
+                    del self.clock.lambda_dict[self]
+
+                except (KeyError, ValueError):
+                    pass
+
+        self.clock.mutex.release()
+
+    def send_data(self):
+
+        if self.cmd is None or self.usb_msg is False: # no usb command 
+            return
+
+        # does nothing if no usb device connected
+        if not gui_global.USB_Middleware.USB_connected:
+            return
+
+        USB_message_type = None
+
+        if gui_global.USB_Middleware.current_comm_protocol == "FDCAN":
+            USB_message_type = "FDCAN_RD/WR"
+
+        elif gui_global.USB_Middleware.current_comm_protocol == "I2C":
+            USB_message_type = "I2C_RD/WR"
+
+        else:
+            # unsupported comm protocol for this module just return
+            return
+
+        try:
+            if self.block_read_cmd:
+                usb_data_bk = gui_global.USB_Middleware.send_usb_msg(USB_message_type, int(self.hex_padding / 2) + 1, 1, self.cmd, "Dynamic readings stat var:" + dpg.get_item_label(self.button))
+            else:
+                usb_data_bk = gui_global.USB_Middleware.send_usb_msg(USB_message_type, int(self.hex_padding / 2), 1, self.cmd, "Dynamic readings stat var:" + dpg.get_item_label(self.button))
+        
+        except gui_global.Invalid_USB_msg_received:
+            return
+
+        if usb_data_bk == []:  # timeout
+            return
+
+
+        start_byte = 2
+        if self.block_read_cmd:
+            start_byte += 1
+        self.output_value = 0
+        for i in range(start_byte,len(usb_data_bk[0])):# moving byte array over to a single int,
+            self.output_value |= usb_data_bk[0][i] << (i - start_byte) * 8
+        self.format_output()
+
+    def delete_element(self):
+        try:
+            # remove clock from dict
+            del self.clock.lambda_dict[self]
+        except (KeyError, ValueError):
+            pass
+        dpg.delete_item(self.parent)

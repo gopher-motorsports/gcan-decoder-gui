@@ -57,12 +57,10 @@ class USB_Interface:
         self.ser.open()
         self.started = True
 
-
     def stop(self):
         if(self.started):
             self.ser.close()
             self.started = False
-
 
     def send_data(self, bytes):
         self.ser.write(bytes)
@@ -81,10 +79,15 @@ class USB_Interface:
         output = self.ser.read(1)
         
         if output[0] == 0x7e: # bypassing usb middleware here 
-            self.paramter_list.append(self.decode_parameter())
-            return(self.get_data())
+            return(self.decode_message(False))
         else:   
-            return(output.append(list(self.ser.read(self.ser.read(1)[0]))))
+            # error case going to loop though buffer, if we find a 0x7e we will decode the message if not return empty list (error)
+            while self.ser.in_waiting != 0:
+                byte = self.ser.read(1)
+                if byte[0] ==  0x7e:
+                    return(self.decode_message(False))
+            
+            return []        
 
     def get_data_paramter(self):
         if self.paramter_list != []:
@@ -95,13 +98,13 @@ class USB_Interface:
             output_data = self.ser.read(1)
 
             if output_data[0] == 0x7e:
-                return(self.decode_parameter())
+                return(self.decode_message(True))
             else:
                 return([]) # does not recursivly call as unlike get_data() this function does not want to wait for a message
         else:
             return([])
 
-    def decode_parameter(self):
+    def decode_message(self, parameter_flag = True):
         try:
             output = []
             data = self.ser.read(4)
@@ -131,57 +134,87 @@ class USB_Interface:
                 else:
                     id += data[1]
 
-            for parameter in self.data["parameters"]:
-                if int(self.data["parameters"][parameter]["id"]) == id:
-                    output.append(self.data["parameters"][parameter])
+            if id == 0xffff: # this is a non paramter message
+                message = []
 
-                    data_len = 0
-                    type = self.data["parameters"][parameter]["type"]
-                    if type == "UNSIGNED8" or type == "SIGNED8":
-                        data_len = 1
-                    elif type == "UNSIGNED16" or type == "SIGNED16":
-                        data_len = 2
-                    elif type == "UNSIGNED32" or type == "SIGNED32" or type == "FLOATING":
-                        data_len = 4
-                    elif type == "COMMAND":
-                        data_len = 5
-                    elif type == "UNSIGNED64" or type == "SIGNED64":
-                        data_len = 8
-                    else:
-                        return []
+                header = int(self.ser.read(1)[0])
+                if header == 0x7D: # get header byte
+                    header = self.ser.read(1)[0]
+                message.append(header)
 
-                    data = self.ser.read(data_len)
-                    data_output = []
-                    i = 0
-                    byte_count = 0
-                    
-                    while byte_count < data_len:
-                        if i >= data_len: # if we have reached the end of the data need to read more
-                            new_data = self.ser.read(1)
-                            if new_data[0] == 0x7D:
-                                data_output.append(int(self.ser.read(1)[0]))
-                            else:
-                                data_output.append(int(new_data[0]))
-                            byte_count += 1
+                message_len = int(self.ser.read(1)[0])
+                if message_len == 0x7D:
+                    message_len = self.ser.read(1)[0]
+                message.append(message_len)
+
+                for _ in range(message_len):
+                    byte = int(self.ser.read(1)[0])
+                    if byte == 0x7D:
+                        byte = self.ser.read(1)[0]
+                    message.append(byte)
+                
+                if parameter_flag:
+                    self.non_paramter_list.append(message)
+                else:
+                    return message
+
+                return(self.decode_message(parameter_flag))
+            
+            else:
+                for parameter in self.data["parameters"]:
+                    if int(self.data["parameters"][parameter]["id"]) == id:
+                        output.append(self.data["parameters"][parameter])
+
+                        data_len = 0
+                        type = self.data["parameters"][parameter]["type"]
+                        if type == "UNSIGNED8" or type == "SIGNED8":
+                            data_len = 1
+                        elif type == "UNSIGNED16" or type == "SIGNED16":
+                            data_len = 2
+                        elif type == "UNSIGNED32" or type == "SIGNED32" or type == "FLOATING":
+                            data_len = 4
+                        elif type == "COMMAND":
+                            data_len = 5
+                        elif type == "UNSIGNED64" or type == "SIGNED64":
+                            data_len = 8
                         else:
-                            if data[i] == 0x7D:
-                                if i == data_len - 1:
+                            return []
+
+                        data = self.ser.read(data_len)
+                        data_output = []
+                        i = 0
+                        byte_count = 0
+                        
+                        while byte_count < data_len:
+                            if i >= data_len: # if we have reached the end of the data need to read more
+                                new_data = self.ser.read(1)
+                                if new_data[0] == 0x7D:
                                     data_output.append(int(self.ser.read(1)[0]))
                                 else:
-                                    data_output.append(int(data[i+1]))
-                                i += 2
+                                    data_output.append(int(new_data[0]))
+                                byte_count += 1
                             else:
-                                data_output.append(int(data[i]))
-                                i += 1
-                            byte_count += 1   
-                    output.append(data_output)
-                    return output
-            """In normal operation the program, should never reach this state, if it does that menas either an invalid paramter id, or more likely
-            the prevous call to this function did not receive the data in time and timed out, and an escape byte must have been read and the escaped byte 
-            was missed causing the program to desyncm  this was fixed by increaseing the timeout and also adding thie return statement, as while a message or two may be dropped, the program should
-            be able to resync with the next message"""
-            #TODO: add more robust error handing to prevent this state from occuring
-            return []
+                                if data[i] == 0x7D:
+                                    if i == data_len - 1:
+                                        data_output.append(int(self.ser.read(1)[0]))
+                                    else:
+                                        data_output.append(int(data[i+1]))
+                                    i += 2
+                                else:
+                                    data_output.append(int(data[i]))
+                                    i += 1
+                                byte_count += 1   
+                        output.append(data_output)
+                        if not parameter_flag:
+                            self.paramter_list.append(output)
+                        else:
+                            return output
+                """In normal operation the program, should never reach this state, if it does that menas either an invalid paramter id, or more likely
+                the prevous call to this function did not receive the data in time and timed out, and an escape byte must have been read and the escaped byte 
+                was missed causing the program to desyncm  this was fixed by increaseing the timeout and also adding thie return statement, as while a message or two may be dropped, the program should
+                be able to resync with the next message"""
+                #TODO: add more robust error handing to prevent this state from occuring
+                return []
               
 
         except IndexError:
@@ -192,11 +225,7 @@ class USB_Interface:
         except KeyError:
             print("key error")
             return []
-        
-        
-
-
-    
+         
     def get_device_name(self):
         return self.port.description
 
@@ -205,7 +234,6 @@ class USB_Interface:
 
     def reset_input_buffer(self):
         self.ser.reset_input_buffer()
-
 
 if __name__ == "__main__":
     test = USB_Interface(1155, 22336)
