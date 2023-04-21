@@ -22,6 +22,7 @@ class Parameter_Home():
             self.gopher_can_config = {}
             gui_global.USB_Middleware.paramter_data = self.gopher_can_config
 
+        gui_global.Parameters.init_parameter_dict() # create parameter dict from yaml file
         with dpg.tab(label="Parameter Home",):  # all code for the layout / configuration of the FDCAN tab should be done in this with statement
 
             # use child window to allow for horizontal scaling

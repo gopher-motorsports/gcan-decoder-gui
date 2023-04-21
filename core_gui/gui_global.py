@@ -209,9 +209,37 @@ class USB_Middleware:
                 if usb_msg == []:  # timeout, just return empty list (does not increment timeout var)
                     USB_Middleware.usb_lock.release()
                     return usb_msgs
+                
                 usb_msgs.append(usb_msg) # we know this is a paramter message due to the get_parameter_data function
                     
+class Parameters:
+    parameter_dict = {}
 
+    @staticmethod
+    def init_parameter_dict():
+        parameter_dict = {}
+        try:
+            for parameter in USB_Middleware.paramter_data["parameters"]:
+                id = int(USB_Middleware.paramter_data["parameters"][parameter]["id"])
+                name = USB_Middleware.paramter_data["parameters"][parameter]["motec_name"]
+                unit = USB_Middleware.paramter_data["parameters"][parameter]["unit"]
+                type = USB_Middleware.paramter_data["parameters"][parameter]["type"]
+                parameter_dict[id] = Parameter(id, name, unit, type)
+        except(KeyError, TypeError):
+            print("Error: Invalid parameter data file")
+            return
+
+        
+
+class Parameter:
+    def __init__(self, id, name, unit, type):
+        self.id = id
+        self.name = name
+        self.unit = unit
+        self.type = type
+        self.data = []
+    
+        
             
 
 class Invalid_USB_msg_received(Exception):
