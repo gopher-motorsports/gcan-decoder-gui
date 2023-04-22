@@ -140,8 +140,8 @@ class Main_GUI:
             self.toggle_bool = True
 
         self.decoder_tab.clock.run_clock_cycle()
-
-
+        self.parameter_home.clock.run_clock_cycle() 
+       
 if (__name__ == "__main__"):
     main_gui = Main_GUI()
     main_gui.start_gui()  # this will not return until the gui is closed

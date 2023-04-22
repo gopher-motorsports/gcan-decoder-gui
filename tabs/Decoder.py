@@ -15,6 +15,11 @@ class Decoder_Tab:
         self.data_mutex = threading.Lock()
         self.type_dict = { }
         self.message_data = [] 
+        try:
+            self.max_table_rows = int(gui_global.Config_File.config["Decoder"]["max_table_rows"])
+        except:
+            print("Decoder: max_table_rows not found in config file, using default value (100000)")
+            self.max_table_rows = 100000
         Decoder_Tab.clock.lambda_dict["None"] = self.decode_message_data # don't care about the key as we are not using it and don't add or remove this element from the dict
         with dpg.tab(label="Parameter log"):
             self.parameter_table_list = []
@@ -54,6 +59,7 @@ class Decoder_Tab:
 
                     # can add support for other files in the future
                     dpg.add_file_extension(".csv")
+                
 
     
 
@@ -76,61 +82,16 @@ class Decoder_Tab:
         with dpg.table_row(parent=self.main_table) as paramter_row:
             parameter_name = dpg.add_text(data[0]["motec_name"])
             # TODO: need to add converion here
-            data_converted = self.decode_bytes(data[1], data[0])
+            data_converted = gui_global.decode_parameter_bytes(data[1], data[0])
             parameter_data = dpg.add_text(str(data_converted) + " " + data[0]["unit"])
             parameter_id = dpg.add_text(data[0]["id"])
             time_val = dpg.add_text(time.asctime(time.localtime()))
 
         self.parameter_table_list.append((paramter_row, parameter_name, parameter_data, parameter_data, time_val))
-        
-    def decode_bytes(self, data, parameter):
-        #TODO: test code
-        # assumes bytes is proerly formatted / length as it is check in the usb driver class / functions
-        if parameter["type"] == "UNSIGNED8":
-            return data[0]
-        
-        elif parameter["type"] == "SIGNED8":
-            # convert unsigend8 to signed8
-            if data[0] > 127:
-                return data[0] - 128
-            else:
-                return data[0]
-            
-        elif parameter["type"] == "UNSIGNED16":
-            return data[0] + (data[1] << 8) 
-        
-        elif parameter["type"] == "SIGNED16":
-            if data[0] > 127:
-                return (data[0] - 128) + (data[1] << 8) - 32768
-            else:
-                return data[0] + (data[1] << 8)
-        
-        elif parameter["type"] == "UNSIGNED32":
-            return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24)
-        
-        elif parameter["type"] == "SIGNED32":
-            if data[0] > 127:
-                return (data[0] - 128) + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) - 2147483648
-            else:
-                return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24)
 
-        elif parameter["type"] == "FLOATING":
-            return round(struct.unpack("f", bytes(data))[0], 2)
-        
-        elif parameter["type"] == "UNSIGNED64":
-            return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56)
-        
-        elif parameter["type"] == "SIGNED64":
-         
-            if data[0] > 127:
-                return (data[0] - 128) + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56) - 9223372036854775808
-            else:
-                return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56)
-        
-        else:
-            return "error no type"
-        
-        
+        if len(self.parameter_table_list) > self.max_table_rows:
+            dpg.delete_item(self.parameter_table_list[0][0])
+            self.parameter_table_list.pop(0)
         
 
     def clear_table(self):

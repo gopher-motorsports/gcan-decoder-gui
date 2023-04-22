@@ -7,12 +7,15 @@ from core_gui.USB_Driver import USB_DeviceNotFound, USB_Interface
 import threading
 import dearpygui.dearpygui as dpg
 from serial import SerialException
+import struct
+import time
 
 primary_window = None
 global_clock_enabled = True
 fdcan_size_ref = [0,1,2,3,4,5,6,7,8,12,16,20,24,32,48,64]  # 64 byte fdcan messages, will probably break the gui (2 usb packets)
 USB_footer = None # the entire footer class defined in footer.py as its modules/ element are commonly refereed to by other parts of the GUI
 mass_debug_invalid_cmd_text = None
+start_time = time.time()
 
 def bin_to_lin11(val):
     # logic was taken form artyPMBus.py
@@ -38,6 +41,53 @@ def str_to_bool(val):
         return True
     else:
         return False
+    
+def decode_parameter_bytes(data, parameter):
+        #TODO: test code
+        # assumes bytes is proerly formatted / length as it is check in the usb driver class / functions
+        if parameter["type"] == "UNSIGNED8":
+            return data[0]
+        
+        elif parameter["type"] == "SIGNED8":
+            # convert unsigend8 to signed8
+            if data[0] > 127:
+                return data[0] - 128
+            else:
+                return data[0]
+            
+        elif parameter["type"] == "UNSIGNED16":
+            return data[0] + (data[1] << 8) 
+        
+        elif parameter["type"] == "SIGNED16":
+            if data[0] > 127:
+                return (data[0] - 128) + (data[1] << 8) - 32768
+            else:
+                return data[0] + (data[1] << 8)
+        
+        elif parameter["type"] == "UNSIGNED32":
+            return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24)
+        
+        elif parameter["type"] == "SIGNED32":
+            if data[0] > 127:
+                return (data[0] - 128) + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) - 2147483648
+            else:
+                return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24)
+
+        elif parameter["type"] == "FLOATING":
+            return round(struct.unpack("f", bytes(data))[0], 2)
+        
+        elif parameter["type"] == "UNSIGNED64":
+            return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56)
+        
+        elif parameter["type"] == "SIGNED64":
+         
+            if data[0] > 127:
+                return (data[0] - 128) + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56) - 9223372036854775808
+            else:
+                return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56)
+        
+        else:
+            return None
 
 # takes in a int(binary) and formats it to fit lin11, 16, hex, ect
 def format_data(format,data,padding=0):
@@ -202,32 +252,62 @@ class USB_Middleware:
     @staticmethod
     def get_usb_gophercan_parameter_msg():
         USB_Middleware.usb_lock.acquire()
-        if USB_Middleware.USB_connected:
-            usb_msgs = []
-            while True: # loop till all parameter messages received 
-                usb_msg = USB_Middleware.USB_Device_id.get_data_paramter()
-                if usb_msg == []:  # timeout, just return empty list (does not increment timeout var)
-                    USB_Middleware.usb_lock.release()
-                    return usb_msgs
-                
-                usb_msgs.append(usb_msg) # we know this is a paramter message due to the get_parameter_data function
+        try:
+            if USB_Middleware.USB_connected:
+                usb_msgs = []
+                while True: # loop till all parameter messages received 
+                    usb_msg = USB_Middleware.USB_Device_id.get_data_paramter()
+                    if usb_msg == []:  # timeout, just return empty list (does not increment timeout var)
+                        USB_Middleware.usb_lock.release()
+                        return usb_msgs
+                    try:
+                        data = decode_parameter_bytes(usb_msg[1], usb_msg[0])
+                        Parameters.add_parameter_data(int(usb_msg[0]["id"]), data)
+                    except(KeyError, TypeError):
+                        print("Error: Invalid parameter data file or parameter id")
+
+                    usb_msgs.append(usb_msg) # we know this is a paramter message due to the get_parameter_data function
+        except(SerialException, OSError):  # usb device disconnected
+            USB_Middleware.USB_connected = False
+            USB_footer.USB_module.usb_disconnected()
+            USB_Middleware.usb_lock.release()
+            return[]
                     
 class Parameters:
     parameter_dict = {}
+    data_max = 10000
 
     @staticmethod
     def init_parameter_dict():
-        parameter_dict = {}
+        Parameters.parameter_dict = {}
+
+        try:
+            Parameters.data_max = int(Config_File.config["Parameter"]["max_data_pts_per_param"])
+        except(KeyError, TypeError, FileNotFoundError):
+            Parameters.data_max = 10000
+
         try:
             for parameter in USB_Middleware.paramter_data["parameters"]:
                 id = int(USB_Middleware.paramter_data["parameters"][parameter]["id"])
                 name = USB_Middleware.paramter_data["parameters"][parameter]["motec_name"]
                 unit = USB_Middleware.paramter_data["parameters"][parameter]["unit"]
                 type = USB_Middleware.paramter_data["parameters"][parameter]["type"]
-                parameter_dict[id] = Parameter(id, name, unit, type)
+                Parameters.parameter_dict[id] = Parameter(id, name, unit, type)
         except(KeyError, TypeError):
             print("Error: Invalid parameter data file")
             return
+    # need to add to list but delete older data if we hit cap
+    @staticmethod
+    def add_parameter_data(id, data):
+        if id in Parameters.parameter_dict:
+            Parameters.parameter_dict[id].data.append(data)
+            time_diff = time.time() - start_time
+            Parameters.parameter_dict[id].time.append(time_diff)
+            if len(Parameters.parameter_dict[id].data) > Parameters.data_max:
+                Parameters.parameter_dict[id].data.pop(0)
+                Parameters.parameter_dict[id].time.pop(0)   
+        else:
+            print("Error: Invalid parameter id")
 
         
 
@@ -238,6 +318,7 @@ class Parameter:
         self.unit = unit
         self.type = type
         self.data = []
+        self.time = []
     
         
             
