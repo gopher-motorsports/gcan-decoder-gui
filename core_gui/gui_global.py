@@ -43,9 +43,6 @@ def str_to_bool(val):
         return False
     
 def decode_parameter_bytes(data, parameter):
-        if(parameter["motec_name"] == "Engine RPM"):
-            print(data)
-            print(str(data[0] + (data[1] << 8)))
         #TODO: test code
         # assumes bytes is proerly formatted / length as it is check in the usb driver class / functions
         if parameter["type"] == "UNSIGNED8":
