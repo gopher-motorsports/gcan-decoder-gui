@@ -12,7 +12,6 @@ import time
 import threading
 
 
-
 # This is the main wrapper for the entire program's gui most of the layout / gui code is in their respective py folder, except for the footer
 class Main_GUI:
     
