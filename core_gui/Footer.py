@@ -104,7 +104,7 @@ class USB_module:
                         width=100,
                         callback=self.update_comm_protocol)
                 except(KeyError,ValueError):
-                    self.comm_bus =  dpg.add_combo(("GopherCAN"), default_value="GopherCAN", width=100, callback=self.update_comm_protocol)
+                    self.comm_bus =  dpg.add_combo(["GopherCAN"], default_value="GopherCAN", width=100, callback=self.update_comm_protocol)
                 
                 try:                    
                     self.device_addr = dpg.add_combo(
@@ -113,7 +113,7 @@ class USB_module:
                         width=100,
                         callback=self.update_USB_addr)
                 except(KeyError,ValueError):
-                    self.device_addr =  dpg.add_combo(("N\\A"), default_value="N\\A", width=100, callback=self.update_USB_addr)
+                    self.device_addr =  dpg.add_combo(["N\\A"], default_value="N\\A", width=100, callback=self.update_USB_addr)
 
                 try:
                     self.global_timer = dpg.add_input_int(width=100, default_value=int(gui_global.Config_File.config['Footer']['default_comm_timer']),callback = self.update_global_clock_tim)
