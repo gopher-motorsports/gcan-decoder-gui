@@ -3,6 +3,7 @@ import dearpygui.dearpygui as dpg
 from tabs.USB_Error_Log import USB_Error_Log
 from tabs.Decoder import Decoder_Tab
 from tabs.Parameter_Home import Parameter_Home
+from tabs.All_parameters import All_Parameters
 
 from core_gui.Footer import Footer
 import core_gui.gui_global as gui_global
@@ -24,12 +25,12 @@ class Main_GUI:
 
         
         if gui_global.Config_File.config is None:
-            dpg.create_viewport(title='Trident_GUI, Ver:1.0.0b', width=1200, height=1000, min_height=700, min_width=700)
+            dpg.create_viewport(title='Gopher CAN decoder, Ver:1.0.0b', width=1200, height=1000, min_height=700, min_width=700)
 
         else:
 
             try:
-                dpg.create_viewport(title='Trident_GUI, Ver:1.0.0b',
+                dpg.create_viewport(title='Gopher CAN decoder, Ver:1.0.0',
                                     width=int(gui_global.Config_File.config['Global']['init_window_width']),
                                     height=int(gui_global.Config_File.config['Global']['init_window_height']),
                                     min_height=int(gui_global.Config_File.config['Global']['window_min_height']),
@@ -46,8 +47,8 @@ class Main_GUI:
         dpg.setup_dearpygui()
         dpg.show_viewport()
 
-        # disabled theme, this changes the appearance of disabled elements
-        with dpg.theme() as disabled_theme:
+        # this changes the appearance of disabled elements and the default color of gui elements
+        with dpg.theme() as main_theme:
 
             with dpg.theme_component(dpg.mvAll, enabled_state=False):
                 dpg.add_theme_color(dpg.mvThemeCol_FrameBg, [47, 47, 47])
@@ -72,7 +73,22 @@ class Main_GUI:
             with dpg.theme_component(dpg.mvText, enabled_state=False):
                 dpg.add_theme_color(dpg.mvThemeCol_Text, [77, 77, 77])
 
-        dpg.bind_theme(disabled_theme)
+            # change blue to red for elements
+            with dpg.theme_component(dpg.mvAll):
+                dpg.add_theme_color(dpg.mvThemeCol_TitleBgActive, [128, 0, 0])
+                dpg.add_theme_color(dpg.mvThemeCol_TabActive, [128, 0, 0])
+                dpg.add_theme_color(dpg.mvThemeCol_TabHovered, [139, 0, 0])
+                dpg.add_theme_color(dpg.mvThemeCol_CheckMark, [170, 34, 34])
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [139, 0, 0])
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [128, 0, 0])
+                dpg.add_theme_color(dpg.mvThemeCol_PlotLines, [128, 0, 0])
+                dpg.add_theme_color(dpg.mvThemeCol_PlotLinesHovered, [139, 0, 0])
+                dpg.add_theme_color(dpg.mvThemeCol_PlotHistogram, [128, 0, 0])
+                dpg.add_theme_color(dpg.mvThemeCol_PlotHistogramHovered, [139, 0, 0])
+                dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, [139, 0, 0])
+
+
+        dpg.bind_theme(main_theme)
 
         # main window
         with dpg.window(label="GUI", tag="main_win") as main_window:
@@ -80,6 +96,7 @@ class Main_GUI:
 
             with dpg.tab_bar():
                 self.parameter_home = Parameter_Home()
+                self.all_parameters = All_Parameters()
                 self.decoder_tab = Decoder_Tab()
                 gui_global.USB_Middleware.usb_error_log_tab = USB_Error_Log()
 
@@ -140,6 +157,7 @@ class Main_GUI:
 
         self.decoder_tab.clock.run_clock_cycle()
         self.parameter_home.clock.run_clock_cycle() 
+        self.all_parameters.clock.run_clock_cycle()
        
 if (__name__ == "__main__"):
     main_gui = Main_GUI()
