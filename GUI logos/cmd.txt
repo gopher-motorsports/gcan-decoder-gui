@@ -1,2 +1,0 @@
-svg command
-magick -density 384 icon.svg -define icon:auto-resize icon.ico
