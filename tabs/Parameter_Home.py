@@ -142,6 +142,7 @@ class Parameter_home_graph():
                 dpg.add_line_series(app_data[0], app_data[1], label=app_data[2], parent=sender)
                 dpg.add_button(label="Delete Series", user_data = dpg.last_item(), parent=dpg.last_item(), callback=lambda s, a, u: dpg.delete_item(u))
 
+            
             with dpg.plot(label="Drag/Drop Plot", height=400, width=-1, drop_callback=_plot_drop, payload_type="plotting"):
                 dpg.add_plot_legend(drop_callback=_legend_drop, payload_type="plotting",show=True)
                 dpg.add_plot_axis(dpg.mvXAxis, label="Time (sec, from gui start)")
@@ -151,8 +152,12 @@ class Parameter_home_graph():
 
 
     def update(self):
+        del_lst = []
         for update in self.update_lst:
-            update.update()
+            if update.update() == False:
+                del_lst.append(update)
+        for i in del_lst:
+            self.update_lst.remove(i)
                     
 class Parameter_update():
     def __init__(self, param_id, plot_id):
@@ -161,7 +166,12 @@ class Parameter_update():
     
     def update(self):
         parameter = gui_global.Parameters.parameter_dict[self.param_id]
-        dpg.set_value(self.plot_id, [parameter.time, parameter.data])
+        try:
+            dpg.set_value(self.plot_id, [parameter.time, parameter.data])
+            return True
+        except:
+            return False
+            
 
 class Parameter_icon_update():
     def __init__(self, param_id, icon_id):
@@ -170,7 +180,9 @@ class Parameter_icon_update():
     
     def update(self):
         parameter = gui_global.Parameters.parameter_dict[self.param_id]
-        dpg.set_value(self.icon_id, parameter.data)
+        if parameter.data is not None:
+            dpg.set_value(self.icon_id, parameter.data)
+
         
 
 

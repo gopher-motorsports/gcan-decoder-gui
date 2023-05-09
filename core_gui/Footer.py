@@ -120,7 +120,10 @@ class USB_module:
 
                 except (KeyError, ValueError):  # invalid config file setting going to delete whatever was drawn and remake with default values                    
                     self.global_timer = dpg.add_input_int(width=100, default_value=1000,callback=self.update_global_clock_tim)
+                self.update_global_clock_tim()
                 
+
+    
             
 
                 self.clock_btn = dpg.add_button(label="Enabled", width=100, callback=self.enable_disable_global_clock)

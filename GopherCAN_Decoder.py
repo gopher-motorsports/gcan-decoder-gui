@@ -25,12 +25,12 @@ class Main_GUI:
 
         
         if gui_global.Config_File.config is None:
-            dpg.create_viewport(title='Gopher CAN decoder, Ver:1.0.0b', width=1200, height=1000, min_height=700, min_width=700)
+            dpg.create_viewport(title='Gopher CAN decoder, Ver:1.0.1', width=1200, height=1000, min_height=700, min_width=700)
 
         else:
 
             try:
-                dpg.create_viewport(title='Gopher CAN decoder, Ver:1.0.0',
+                dpg.create_viewport(title='Gopher CAN decoder, Ver:1.0.1',
                                     width=int(gui_global.Config_File.config['Global']['init_window_width']),
                                     height=int(gui_global.Config_File.config['Global']['init_window_height']),
                                     min_height=int(gui_global.Config_File.config['Global']['window_min_height']),

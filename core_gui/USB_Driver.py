@@ -107,32 +107,45 @@ class USB_Interface:
     def decode_message(self, parameter_flag = True):
         try:
             output = []
-            data = self.ser.read(4)
-            if len(data) != 4:
-                return []
-            for byte in data:
-                if byte == 0x7D:
-                    # need to skip over excape byte and data byte
-                    i = self.ser.read(1) # need to flush extra byte due to escape
-                    if len(i) != 1:
+            check_sum = 0x7e
+            for _ in range(4):
+                byte = self.ser.read(1)
+                if len(byte) == 0:
+                    return []
+                
+                if byte[0] == 0x7D:
+                    byte = self.ser.read(1)
+                    if len(byte) == 0:
                         return []
+                    byte = byte[0] ^ 0x20
+                    check_sum += byte
+
+                else:
+                    byte = byte[0]
+                    check_sum += byte      
             
             data = self.ser.read(2)
             id  = 0
             if data[0] == 0x7D:
-                id = data[1] << 8
+                id = (data[1] << 8) ^ 0x20
                 new_data = self.ser.read(1)
                 if new_data[0] == 0x7D:
-                    id += self.ser.read(1)[0]
+                    id += self.ser.read(1)[0] ^ 0x20
+                    check_sum += id 
                 else:
                     id += new_data[0]
+                    check_sum += new_data[0]
                 
             else: 
                 id = data[0] << 8
+                check_sum += data[0]
                 if data[1] == 0x7D:
-                    id += self.ser.read(1)[0]
+                    data_byte = int(self.ser.read(1)[0]) ^ 0x20
+                    id += data_byte
+                    check_sum += data_byte
                 else:
                     id += data[1]
+                    check_sum += data[1]
 
             if id == 0xffff: # this is a non paramter message
                 message = []
@@ -189,25 +202,41 @@ class USB_Interface:
                             if i >= data_len: # if we have reached the end of the data need to read more
                                 new_data = self.ser.read(1)
                                 if new_data[0] == 0x7D:
-                                    data_output.append(int(self.ser.read(1)[0]))
+                                    data_byte = int(self.ser.read(1)[0]) ^ 0x20
+                                    data_output.append(data_byte)
+                                    check_sum += data_byte
                                 else:
                                     data_output.append(int(new_data[0]))
+                                    check_sum += int(new_data[0])
                                 byte_count += 1
                             else:
                                 if data[i] == 0x7D:
                                     if i == data_len - 1:
-                                        data_output.append(int(self.ser.read(1)[0]))
+                                        data_byte = int(self.ser.read(1)[0]) ^ 0x20
+                                        data_output.append(data_byte)
+                                        check_sum += data_byte
                                     else:
-                                        data_output.append(int(data[i+1]))
+                                        data_output.append(int(data[i+1]) ^ 0x20)
+                                        check_sum += int(data[i+1] ^ 0x20)
                                     i += 2
                                 else:
                                     data_output.append(int(data[i]))
+                                    check_sum += int(data[i])
                                     i += 1
                                 byte_count += 1
                         chk = self.ser.read(1) # read checksum 
-                        if chk[0] == 0x7D:
-                            chk = self.ser.read(1)
+                        if len(chk) == 0:
+                            return []
+                        chk = int(chk[0])
+                        if chk == 0x7D:
+                            chk = int(self.ser.read(1)[0]) ^ 0x20
                         #TODO: add checksum checking
+                        if (check_sum).to_bytes(2,byteorder="big")[-1] != chk:  
+                            print("checksum bad")
+                            print(hex(check_sum))
+                            print(hex(chk))
+                            return self.decode_message(parameter_flag)
+                            
                         output.append(data_output)
                         if not parameter_flag:
                             self.paramter_list.append(output)

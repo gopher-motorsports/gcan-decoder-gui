@@ -45,46 +45,21 @@ def str_to_bool(val):
 def decode_parameter_bytes(data, parameter):
         #TODO: test code
         # assumes bytes is proerly formatted / length as it is check in the usb driver class / functions
-        if parameter["type"] == "UNSIGNED8":
-            return data[0]
-        
-        elif parameter["type"] == "SIGNED8":
-            # convert unsigend8 to signed8
-            if data[0] > 127:
-                return data[0] - 128
-            else:
-                return data[0]
-            
-        elif parameter["type"] == "UNSIGNED16":
-            return data[0] + (data[1] << 8) 
-        
-        elif parameter["type"] == "SIGNED16":
-            if data[0] > 127:
-                return (data[0] - 128) + (data[1] << 8) - 32768
-            else:
-                return data[0] + (data[1] << 8)
-        
-        elif parameter["type"] == "UNSIGNED32":
-            return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24)
-        
-        elif parameter["type"] == "SIGNED32":
-            if data[0] > 127:
-                return (data[0] - 128) + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) - 2147483648
-            else:
-                return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24)
+        # big endian
 
+        data_bytes = bytes(data)
+        output = None
+        if parameter["type"] == "UNSIGNED8" or parameter["type"] == "UNSIGNED16" or parameter["type"] == "UNSIGNED32" or parameter["type"] == "UNSIGNED64":
+            output = int.from_bytes(data_bytes, byteorder='big', signed=False)
+            return output
+        
+        elif parameter["type"] == "SIGNED8" or parameter["type"] == "SIGNED16" or parameter["type"] == "SIGNED32" or parameter["type"] == "SIGNED64":
+            output = int.from_bytes(data_bytes, byteorder='big', signed=True)
+            return output
+             
         elif parameter["type"] == "FLOATING":
-            return round(struct.unpack("f", bytes(data))[0], 2)
-        
-        elif parameter["type"] == "UNSIGNED64":
-            return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56)
-        
-        elif parameter["type"] == "SIGNED64":
-         
-            if data[0] > 127:
-                return (data[0] - 128) + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56) - 9223372036854775808
-            else:
-                return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24) + (data[4] << 32) + (data[5] << 40) + (data[6] << 48) + (data[7] << 56)
+            output = round(struct.unpack(">f", data_bytes)[0], 2)
+            return output
         
         else:
             return None
@@ -262,7 +237,8 @@ class USB_Middleware:
                         return usb_msgs
                     try:
                         data = decode_parameter_bytes(usb_msg[1], usb_msg[0])
-                        Parameters.add_parameter_data(int(usb_msg[0]["id"]), data)
+                        if data != None:
+                            Parameters.add_parameter_data(int(usb_msg[0]["id"]), data)
                     except(KeyError, TypeError):
                         print("Error: Invalid parameter data file or parameter id")
 
